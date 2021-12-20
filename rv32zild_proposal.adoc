@@ -1,12 +1,12 @@
 [#Zild]
-==== Zild v0.10
+= Zild v0.10
 
 This document is in the Discussion Document state. Assume everything can change. This document is not complete yet and was created only for the purpose of conversation outside of the document. For more information see: https://riscv.org/spec-state
 
 Zild (working title) is a RV32-only extension, with the sole purpose of enabling the LD (64-bit register load) and SD (64-bit register store) instructions from RV64.
 
 [#Rationale]
-=== Rationale
+== Rationale
 
 The motivation behind this proposal is a combination of multiple use-cases:
 
@@ -16,7 +16,7 @@ The motivation behind this proposal is a combination of multiple use-cases:
 * Code size (in case the <<Optional_compressed,compressed encodings>> are included): being able to encode two adjacent 32-bit loads/stores with a single compressed instruction could have the potential to save quite a bit of code size (measurements/bencmarking would be needed to determine how much).
 
 [#Instructions]
-=== Instructions
+== Instructions
 
 This proposed extension doesn't specify any new instructions per se, it only adds support for instructions which already exist in the 64-bit base ISA to RV32.
 

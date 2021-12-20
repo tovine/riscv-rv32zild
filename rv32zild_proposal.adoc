@@ -48,3 +48,11 @@ If the compressed extension link:++https://github.com/riscv/riscv-code-size-redu
 This is of course incompatible with the (RV32) F extension, as those opcodes are then occupied by the single-precision load/store ops (C.FLW, C.FSW, C.FLWSP and C.FSWSP respectively).
 Therefore those instructions should be added as a separate *Zcld* or similar sub-extension (or naturally follow if *Zild* and *Zca* [but _not Zcf_] are enabled). +
 Because of the <<restrictions>> imposed on register selection, 1 bit of all the compressed encodings (the ones for _rs2[0]_ and _rd[0]_) can be reserved and thus we free up half the code points for future use.
+
+[#Enhanced_encodings]
+==== Extra encoding bit
+
+Alternatively, the bit saved by the pairwise register assignment could be repurposed to give more utility by extending the addressable register or immediate range - for example like this:
+
+* For LD and SD: introduce new register encoding *rs/rd''* - `[2:1|4]`, making it possible to address registers *8,10,..,30* (bit 3 still implicitly wired to 1 for more similarity with existing encoding).
+* For LDSP and SDSP: add another high-order bit to the immediate, doubling the addressable range.

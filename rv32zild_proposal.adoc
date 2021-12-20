@@ -1,0 +1,50 @@
+[#Zild]
+==== Zild v0.10
+
+This document is in the Discussion Document state. Assume everything can change. This document is not complete yet and was created only for the purpose of conversation outside of the document. For more information see: https://riscv.org/spec-state
+
+Zild (working title) is a RV32-only extension, with the sole purpose of enabling the LD (64-bit register load) and SD (64-bit register store) instructions from RV64.
+
+[#Rationale]
+=== Rationale
+
+The motivation behind this proposal is a combination of multiple use-cases:
+
+* Performance: in applications with very tight inner-loops, the ability to issue multiple register loads with a single instruction can be beneficial in order to meet tight real-time requirements where every CPU cycle counts. If the CPU bus interface is 64 bits or wider this will also allow for better utilization and double the throughput compared to just LW.footnote:[While the same _could_ be achieved using macro-op fusion, having a dedicated instruction for this makes it easier for smaller implementations with simple decoders and short pipelines to utilize this. The most realistic alternative for most smaller implementations would be to fuse two adjacent C.LW instructions, as anything else would require a decoder wider than 32 bits and/or multiple decode stages - all adding complexity and (power/area) cost.]
+* Atomicity: in some cases, the ability to read or write two 32-bit registers in an atomic fashion can be beneficial
+* Zdinx: with the https://github.com/riscv/riscv-zfinx/blob/main/zfinx-1.0.0-rc.pdf[Zdinx] extension, the LD instruction can be used to load a double-precision floating-point value into two adjacent integer registers for use by the FP ops; directly replacing the FLD instruction.
+* Code size (in case the <<Optional_compressed,compressed encodings>> are included): being able to encode two adjacent 32-bit loads/stores with a single compressed instruction could have the potential to save quite a bit of code size (measurements/bencmarking would be needed to determine how much).
+
+[#Instructions]
+=== Instructions
+
+This proposed extension doesn't specify any new instructions per se, it only adds support for instructions which already exist in the 64-bit base ISA to RV32.
+
+[[restrictions]]
+The instructions will follow the same restrictions in terms of register specification as the https://github.com/riscv/riscv-zfinx/blob/main/zfinx-1.0.0-rc.pdf[Zdinx] extension:
+
+* Registers are allocated in pairs with *r* containing the low-order bits (31:0) of the 64-bit value, and *(r+1)* containing the high-order bits (63:32).
+  - _This alignment applies regardless of machine endianness_.
+* Only even-numbered registers may be used - odd-numbered register encodings are _reserved_.footnote:[Since this restriction is already in place for the Zdinx extension it makes sense to keep it here as well]
+  - If *x0/zero* is specified as the *rs2* source operand of a store operation, _zero_ should be written for both words - regardless of the contents in *x1*.
+  - Conversely, if *x0/zero* is specified as the destination, *x1* should *_not_* be updated with the upper half of the result.
+
+
+The following instructions would be added (enabled) by this extension:
+
+* LD: 64-bit data load into *{rd+1, rd}* from memory address stored in *rs1 (+ immediate)*
+* SD: 64-bit data store from *{rs2+1, rs2}* to memory address stored in *rs1 (+ immediate)*
+
+[#Optional_compressed]
+=== (Optional) compresed encodings
+
+If the compressed extension link:++https://github.com/riscv/riscv-code-size-reduction/blob/master/Zce-release-candidate/Zc.adoc#zca++[Zca] is enabled, then we can add the RV64C encodings for 64-bit loads as well:
+
+* C.LD: 64-bit data load
+* C.SD: 64-bit data store
+* C.LDSP: 64-bit data load (stack-pointer relative)
+* C.SDSP: 64-bit data store (stack-pointer relative)
+
+This is of course incompatible with the (RV32) F extension, as those opcodes are then occupied by the single-precision load/store ops (C.FLW, C.FSW, C.FLWSP and C.FSWSP respectively).
+Therefore those instructions should be added as a separate *Zcld* or similar sub-extension (or naturally follow if *Zild* and *Zca* [but _not Zcf_] are enabled). +
+Because of the <<restrictions>> imposed on register selection, 1 bit of all the compressed encodings (the ones for _rs2[0]_ and _rd[0]_) can be reserved and thus we free up half the code points for future use.

@@ -3,7 +3,7 @@
 
 This document is in the Discussion Document state. Assume everything can change. This document is not complete yet and was created only for the purpose of conversation outside of the document. For more information see: https://riscv.org/spec-state
 
-Zild (working title) is a RV32-only extension, with the sole purpose of enabling the LD (64-bit register load) and SD (64-bit register store) instructions from RV64.
+Zild (working title) is a RV32-only extension, with the sole purpose of enabling 64-bit load/store instructions from the RV64 ISA into RV32.
 
 [#Rationale]
 == Rationale
@@ -32,13 +32,13 @@ The instructions will follow the same restrictions in terms of register specific
 
 The following instructions would be added (enabled) by this extension:
 
-* LD: 64-bit data load into *{rd+1, rd}* from memory address stored in *rs1 (+ immediate)*
-* SD: 64-bit data store from *{rs2+1, rs2}* to memory address stored in *rs1 (+ immediate)*
+* LD: 64-bit data load into *{rd+1, rd}* from memory address stored in *rs1 + immediate*
+* SD: 64-bit data store from *{rs2+1, rs2}* to memory address stored in *rs1 + immediate*
 
 [#Optional_compressed]
 === (Optional) compresed encodings
 
-If the compressed extension link:++https://github.com/riscv/riscv-code-size-reduction/blob/master/Zce-release-candidate/Zc.adoc#zca++[Zca] is enabled, then we can add the RV64C encodings for 64-bit loads as well:
+If the compressed extension link:++https://github.com/riscv/riscv-code-size-reduction/blob/master/Zce-release-candidate/Zc.adoc#zca++[Zca] is enabled, then we can add the RV64C encodings for 64-bit load/stores as well:
 
 * C.LD: 64-bit data load
 * C.SD: 64-bit data store
@@ -47,4 +47,4 @@ If the compressed extension link:++https://github.com/riscv/riscv-code-size-redu
 
 This is of course incompatible with the (RV32) F extension, as those opcodes are then occupied by the single-precision load/store ops (C.FLW, C.FSW, C.FLWSP and C.FSWSP respectively).
 Therefore those instructions should be added as a separate *Zcld* or similar sub-extension (or naturally follow if *Zild* and *Zca* [but _not Zcf_] are enabled). +
-Because of the <<restrictions>> imposed on register selection, 1 bit of all the compressed encodings (the ones for _rs2[0]_ and _rd[0]_) can be reserved and thus we free up half the code points for future use.
+Because of the <<restrictions>> imposed on register selection, 2 bits of all the compressed encodings (the ones for _rs2[0]_ and _rd[0]_) can be reserved and thus we free up 3/4 of the code points for future use. 

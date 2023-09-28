@@ -1,14 +1,20 @@
-[#Zild]
-= Zild v0.11
+[#Zilsp]
+= Zilsp (Integer Load/Store Pairs) v0.12
 
-This document is in the Discussion Document state. Assume everything can change. This document is not complete yet and was created only for the purpose of conversation outside of the document. For more information see: https://riscv.org/spec-state
+NOTE: This document is in the Discussion Document state. Assume everything can change. This document is not complete yet and was created only for the purpose of conversation outside of the document. For more information see: https://riscv.org/spec-state
 
-Zild (working title) is a RV32-only extension, with the sole purpose of enabling 64-bit load/store instructions from the RV64 base ISA into RV32.
+Zilsp (working title) is an RV32-only extension, with the sole purpose of enabling 64-bit load/store instructions from the RV64 base ISA into RV32.
 
-Similarly, Zilq (working title) is a RV64-only extension, with the sole purpose of enabling 128-bit load/store instructions from the RV128 base ISA into RV64.
+In the future, a similar extension could be added for RV64, with the purpose of enabling 128-bit load/store instructions from the RV128 base ISA into RV64 once that has been ratified. See <<future_RV64_instructions>> and <<RV64_compressed,future compressed RV64 instructions>>
 
 [#Changes]
 == Changes
+
+=== Changes since v0.11
+
+* Removed RV64 instructions from the initial spec and instead kept them as future improvements since RV128 isn't yet ratified (see https://github.com/tovine/riscv-rv32zild/issues/6)
+* Renamed the extension from Zild to Zilsp (thanks to Christian Herber for the suggestion)
+* Addressed how misaligned accesses should be treated
 
 === Changes since v0.10 (initial version)
 
@@ -29,32 +35,44 @@ The motivation behind this proposal is a combination of multiple use-cases:
 [#Instructions]
 == Instructions
 
-This proposed extension doesn't specify any new instructions per se, it only adds support for instructions which already exist in the 64-bit base ISA to RV32, or instructions which already exist in the 128-bit ISA to RV64.
+This proposed extension doesn't specify any new instructions per se, it only adds support for instructions which already exist in the 64-bit base ISA to RV32.
 
 [[restrictions]]
 The instructions will follow the same restrictions in terms of register specification as the https://github.com/riscv/riscv-zfinx/blob/main/zfinx-1.0.0-rc.pdf[Zdinx] extension:
 
 * Registers are allocated in pairs with *r* containing the lower half of the value, and *(r+1)* containing the upper half.
   - *For RV32* _lower half_ means bits (31:0) of the 64-bit value, and the _upper half_ means the high-order bits (63:32).
-  - Similarly *for RV64* the _lower half_ refers to bits (63:0) of the 128-bit value, and the _upper half_ refers to bits (127:64).
+  - Similarly *for a future RV64 extension* the _lower half_ would refer to bits (63:0) of the 128-bit value, and the _upper half_ would refer to bits (127:64).
   - _This alignment applies regardless of machine endianness_.
 * Only even-numbered registers may be used - odd-numbered register encodings are _reserved_.footnote:[Since this restriction is already in place for the Zdinx extension it makes sense to keep it here as well]
   - If *x0/zero* is specified as the *rs2* source operand of a store operation, _zero_ should be written for both words - regardless of the contents in *x1*.
   - Conversely, if *x0/zero* is specified as the destination, *x1* should *_not_* be updated with the upper half of the result.
 
+Regarding accesses that are not naturally *_2*XLEN-aligned_*, this extension will follow the example given by the base ISA; *misaligned accesses are not _required_ to raise an address-misaligned exception*, but raising such an exception in this case is perfectly valid behavior, and *atomicity is _not_ mandated for such misaligned accesses*. +
+For best performance across different implementations, software should make sure that load/store-pair instructions are only generated with *_2*XLEN-aligned_* addresses.
 
+If a misaligned access crosses a page boundary it should follow the same behavior as for other accesses that are not naturally aligned to the data width. In case of an access fault trap in the second half (when the implementation supports accesses that are not naturally aligned), the behavior will be like defined in the Privileged Spec; the `xtval` CSR (if implemented) will contain the virtual address of the portion of the access that caused the fault.
+
+=== Currently proposed instructions
 The following instructions would be added (enabled) by this extension for RV32:
 
 * LD: 64-bit data load into *{rd+1, rd}* from memory address stored in *rs1 + immediate*
 * SD: 64-bit data store from *{rs2+1, rs2}* to memory address stored in *rs1 + immediate*
 
-The following instructions would be added (enabled) by this extension for RV64:
+[#future_RV64_instructions]
+==== Future RV64 instructions
+
+NOTE: This section is just an idea for a future where the RV128 is defined, and will not be part of the current extension proposal.
+
+The following instructions could be added (enabled) by a future extension for RV64 (once RV128 is defined):
 
 * LQ: 128-bit data load into *{rd+1, rd}* from memory address stored in *rs1 + immediate*
 * SQ: 128-bit data store from *{rs2+1, rs2}* to memory address stored in *rs1 + immediate*
 
 [#Optional_compressed]
 === (Optional) compressed encodings
+
+NOTE: If this cannot be inferred directly from the presence of *Zilsp* and *Zca* (but _not_ *Zcf*), then we could define a separate extension *Zclsp* (Compressed Load/Store Pairs) containing the following compressed instructions
 
 ==== RV32
 
@@ -66,10 +84,13 @@ If the compressed extension link:++https://github.com/riscv/riscv-code-size-redu
 * C.SDSP: 64-bit data store (stack-pointer relative)
 
 This is of course incompatible with the (RV32) F extension, as those opcodes are then occupied by the single-precision load/store ops (C.FLW, C.FSW, C.FLWSP and C.FSWSP respectively).
-Therefore those instructions should be added as a separate *Zcld* or similar sub-extension (or naturally follow if *Zild* and *Zca* [but _not Zcf_] are enabled). +
-Because of the <<restrictions>> imposed on register selection, 1 bit of all the compressed encodings (the ones for _rs2[0]_ and _rd[0]_) can be reserved and thus we free up half the code points for future use.
 
+Because of the <<restrictions>> imposed on register selection, the least significant bit of the register selections for all the compressed encodings (the ones for _rs1[0]_, _rs2[0]_ and _rd[0]_) can be reserved and thus we free up half the code points (and twice of that for C.LD/C.SD) for future use.
+
+[#RV64_compressed]
 ==== RV64
+
+NOTE: Although the RV128 base ISA is not yet defined, the compressed encodings are included in the Zca extension. Therefore we could push this as a compressed-only RV64 extension, although if it turns out to be too controversial we can hold off until the non-compressed counterparts (LQ/SQ) are defined
 
 If the compressed extension link:++https://github.com/riscv/riscv-code-size-reduction/blob/master/Zce-release-candidate/Zc.adoc#zca++[Zca] is enabled, then we can add the RV128C encodings for 128-bit load/stores to RV64 as well:
 
@@ -79,8 +100,8 @@ If the compressed extension link:++https://github.com/riscv/riscv-code-size-redu
 * C.SQSP: 128-bit data store (stack-pointer relative)
 
 This is of course incompatible with the (RV64) D extension, as those opcodes are then occupied by the double-precision load/store ops (C.FLD, C.FSD, C.FLDSP and C.FSDSP respectively).
-Therefore those instructions should be added as a separate *Zclq* or similar sub-extension (or naturally follow if *Zilq* and *Zca* [but _not Zcd_] are enabled). +
-Because of the <<restrictions>> imposed on register selection, 1 bit of all the compressed encodings (the ones for _rs2[0]_ and _rd[0]_) can be reserved and thus we free up half the code points for future use.
+
+Because of the <<restrictions>> imposed on register selection, the least significant bit of the register selections for all the compressed encodings (the ones for _rs1[0]_, _rs2[0]_ and _rd[0]_) can be reserved and thus we free up half the code points (and twice of that for C.LQ/C.SQ) for future use.
 
 [#Enhanced_encodings]
 ==== Extra encoding bit (future discussion)
